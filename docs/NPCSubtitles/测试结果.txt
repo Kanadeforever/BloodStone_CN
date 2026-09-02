@@ -1,0 +1,9 @@
+NPCSubtitles 0.2.2 D3D9InteropSafe 测试结果
+
+自动化源码测试：18/18 PASS
+源码验证：PASS
+真实 MSVC x86 编译：未在当前环境执行
+实机：待用户验证
+
+本轮回归重点：0.2.1 dummy Device 污染 BloodstoneCN GPU 字体资源。
+修复：early renderer install + raw d3d9 export bootstrap + foreign CreateDevice owner 安全拒绝。

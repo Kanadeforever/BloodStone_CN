@@ -1,0 +1,2 @@
+NPCSubtitles 0.2.2 D3D9InteropSafe
+基于 0.2.1；修复 dummy-device bootstrap 污染 BloodstoneCN 主汉化 GPU 设备/字体资源的问题。

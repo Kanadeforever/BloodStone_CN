@@ -1,0 +1,6 @@
+NPCSubtitles 0.2.2 D3D9InteropSafe
+
+当前环境未执行真实 Windows MSVC x86 编译。
+源码合约/模型测试：18/18 PASS。
+tools/verify_source.py：PASS。
+必须在用户 Windows MSVC x86 环境运行 build_msvc_x86.bat 后再实机。
