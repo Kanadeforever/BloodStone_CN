@@ -42,11 +42,11 @@
 
 | 本目录内的路径 | 内容 |
 |---|---|
-| `input/gamedata.pak` | 本人游戏的原文结构副本 |
-| `input/template/` | 本人原始 EUR DAT/BPR；可选个人 BFA |
+| `input/gamedata.pak` | 游戏的原文结构副本（工具自动复制） |
+| `input/template/` | 原始 EUR DAT/BPR；可选个人 BFA |
 | `input/fonts/` | 当前选定字体的副本 |
-| `input/font_options.json` | 个人字号设置；没有时采用 `config/defaults.json` |
-| `translations/` | 唯一人工译文源 |
+| `input/font_options.json` | 字号设置；没有时采用 `config/defaults.json` |
+| `translations/` | 唯一人工译文源（工具自动导出） |
 | `work/project.json` | 初始化输入指纹与来源 |
 | `output/loc/` | 原文副本、LOC 单项构建报告和回编结果 |
 | `output/font/` | 字库单项报告与生成结果 |
