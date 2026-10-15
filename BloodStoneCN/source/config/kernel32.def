@@ -1,0 +1,27 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+    GetModuleHandleW
+    GetModuleFileNameW
+    GetFileAttributesW
+    WideCharToMultiByte
+    GetShortPathNameW
+    VirtualProtect
+    GetCurrentProcess
+    FlushInstructionCache
+    OutputDebugStringA
+    CreateThread
+    Sleep
+    CreateFileW
+    WriteFile
+    CloseHandle
+    GetCommandLineW
+    GetTickCount
+    GetCurrentProcessId
+    GetLastError
+    MultiByteToWideChar
+    FlushFileBuffers
+    GetFileSize
+    FindFirstFileW
+    FindNextFileW
+    FindClose
+    ReadFile

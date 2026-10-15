@@ -1,0 +1,72 @@
+{
+  "source": "Bond.unpacked_analysis.exe（用户 2026-10-04 运行时明文转储）",
+  "original_pe_size": 16496128,
+  "sha256": "105990356c63009739f6753403223069936a0f4d5aaf34df1658fa3e49080e76",
+  "image_base": "0x00400000",
+  "note": "已登记两份运行时明文转储的整文件指纹；五处指令与原文字串同时必须精确匹配，运行时仍需在 EXE 解密后才写入。",
+  "sites": [
+    {
+      "name": "loc_common",
+      "instruction_va": "0x00C33948",
+      "instruction_rva": "0x00833948",
+      "instruction_bytes": "6844B71701",
+      "target_va": "0x0117B744",
+      "string": "gamedata\\xt\\Loc\\"
+    },
+    {
+      "name": "loc_levels",
+      "instruction_va": "0x00C33ACC",
+      "instruction_rva": "0x00833ACC",
+      "instruction_bytes": "6858B71701",
+      "target_va": "0x0117B758",
+      "string": "gamedata\\xt\\Loc\\Levels\\%s\\"
+    },
+    {
+      "name": "loc_multiplayer",
+      "instruction_va": "0x00C33ABD",
+      "instruction_rva": "0x00833ABD",
+      "instruction_bytes": "6874B71701",
+      "target_va": "0x0117B774",
+      "string": "gamedata\\xt\\Loc\\MultiplayerLevels\\%s\\"
+    },
+    {
+      "name": "font_resource",
+      "instruction_va": "0x00C36870",
+      "instruction_rva": "0x00836870",
+      "instruction_bytes": "68B0C11701",
+      "target_va": "0x0117C1B0",
+      "string": "Ui/Data/ui_font_eur"
+    },
+    {
+      "name": "font_dat",
+      "instruction_va": "0x00C36BA4",
+      "instruction_rva": "0x00836BA4",
+      "instruction_bytes": "68D0C01701",
+      "target_va": "0x0117C0D0",
+      "string": "Ui/data/ui_font_eur.dat"
+    }
+  ],
+  "known_dump_sha256": [
+    "105990356c63009739f6753403223069936a0f4d5aaf34df1658fa3e49080e76",
+    "a3b1bf48cd9f393d7d0a4989d21c642573b0c385ad5fc2c606fd237401cadc4d"
+  ],
+  "text_effect": {
+    "name": "UIBondText 随机字母扰动关闭",
+    "dispatch_va": "0x00C6993E",
+    "dispatch_bytes": "83F8030F876F020000FF2485749CC600",
+    "jump_table_va": "0x00C69C74",
+    "original_targets": [
+      "0x00C6994E",
+      "0x00C69976",
+      "0x00C69A5C",
+      "0x00C69B3E"
+    ],
+    "disabled_target_va": "0x00C69BB6",
+    "random_branch_bytes": "B801000000394620",
+    "random_branch_va": "0x00C69A5C",
+    "ascii_clamp_va": "0x00C69A9E",
+    "ascii_clamp_bytes": "0FB7C16683F87A",
+    "skip_branch_bytes": "8B55088B442418",
+    "notes": "第三分支依据原始字符计算临时字母并截断至 0x7A；只将该分支改走原生循环继续位置，不改写剩余三个分支。"
+  }
+}
