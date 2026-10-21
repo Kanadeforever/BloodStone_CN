@@ -39,10 +39,11 @@ class CutsceneRegression(unittest.TestCase):
         self.assertIn('NATIVE_DIALOGUE_QUEUE_CLEARED',S)
 
     def test_no_draw_or_enqueue_during_scene(self):
-        self.assertIn('if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE))return;',S)
-        self.assertIn('if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE)){UnlockSubtitles();return;}',S)
+        self.assertIn('if(!allowlisted&&__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE))return;',S)
+        self.assertIn('if(inside_scene&&!allowlisted){UnlockSubtitles();return;}',S)
         self.assertIn('CUTSCENE_END_QUEUE_RESUMED',S)
-        self.assertIn('CUTSCENE_START_QUEUE_CLEARED',S)
+        self.assertIn('CUTSCENE_START_QUEUE_RETAINED',S)
+        self.assertIn('subtitle_queue::Retain(g_subtitles,IsAllowlisted)',S)
         self.assertIn('if(!g_diagnostics_enabled)return;',S)
         self.assertNotIn('BATTLECHATTER_ACCEPTED_PLAYBACK_HOOK_READY',S)
 

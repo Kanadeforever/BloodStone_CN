@@ -32,3 +32,8 @@ python source/NPCSubtitles/tools/analyze_subtitle_route_log.py NPCSubtitles.log
 `tests/test_cutscene_transition.py` 验证 `CutSceneStart/End` 的原生事件编号、发送入口原始 CALL 的安全检查、x86 跳板寄存器保护、过场期间禁止入队及绘制、`--log` 门控。`tests/queue_native_test.cpp` 还会直接运行活动队列代码，验证三条可见字幕和等待消息清空后不会再次出现，以及后续新对白能重新入队。该测试不要求原版游戏文件。
 
 实际过场事件在不同关卡是否都会触发需要 Windows 实机验证；如果不触发或 Hook 安装失败，不得仅凭静态测试宣称覆盖。
+
+
+## 白名单专项验证
+
+`tests/test_cutscene_allowlist.py` 和 `tests/allowlist_queue_native_test.cpp` 验证四条过场恢复白名单（并断言六条已移除）的精确匹配、过场清队与环形等待队列顺序。原生测试优先采用 Clang++，没有 C++ 编译器时该子测试跳过，不能将跳过误算为通过。

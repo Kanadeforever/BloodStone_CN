@@ -29,7 +29,7 @@ def main():
     if process.returncode:return process.returncode
     cpp=subprocess.run([sys.executable,str(ROOT/'tools/check_cpp_brackets.py')])
     if cpp.returncode:return cpp.returncode
-    print('[通过] 编译产物 PE、活动源码合同及统一编码检查；Windows 实机仍待验证')
+    print('[通过] 编译产物 PE、活动源码合同及统一编码检查；本版为 log9 四条白名单封版维护；实际二进制仍需 Windows 环境实机运行')
     return 0
 
 if __name__=='__main__':raise SystemExit(main())

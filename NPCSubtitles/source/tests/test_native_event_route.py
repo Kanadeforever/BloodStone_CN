@@ -41,10 +41,10 @@ class NativeEventRoute(unittest.TestCase):
         for snippet in ('ReadMemory((const U8*)frame->edi+ROUTE_FLAG_OFFSET,&value,1)',
                         'g_route_is_npc=(value==1)?1u:0u;',
                         'const bool route_known=g_route_known&&g_route_hash==hash;',
-                        'if(!route_known)', 'if(!npc_event)',
+                        'if(!route_known&&!allowlisted)', 'if(!npc_event&&!allowlisted)',
                         'NPC_NATIVE_EVENT_SUPPRESSED', 'NPC_EVENT_ROUTE_UNKNOWN'):
             self.assertIn(snippet,SOURCE)
-        self.assertLess(SOURCE.index('if(!npc_event)'),SOURCE.index('const Entry* entry=FindEntry(hash);'))
+        self.assertLess(SOURCE.index('if(!npc_event&&!allowlisted)'),SOURCE.index('const Entry* entry=FindEntry(hash);'))
         for forbidden in ('NativeUiProbeThunk','InstallNativeUiProbe','g_orig_native_ui',
                           'NATIVE_UI_CALL_VA','SemanticSignature(','k_embedded_routes'):
             self.assertNotIn(forbidden,SOURCE)

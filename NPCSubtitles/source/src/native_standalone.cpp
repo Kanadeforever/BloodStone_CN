@@ -3,6 +3,7 @@
 // 本源文件不依赖 C++ 标准库与 Windows SDK，保证可在本项目封存的 Clang/LLD 上离线构建。
 #include "win32_minimal.h"
 #include "subtitle_queue.h"
+#include "cutscene_allowlist.h"
 
 #ifndef NPC_DIAG_STAGE
 #define NPC_DIAG_STAGE 4
@@ -73,6 +74,10 @@ Entry* g_entries_table=nullptr;
 // 1 表示不走该原生字幕提交分支。只使用来自实际事件的字段判断，
 // 不按对白正文、角色名称或调用栈签名推测字幕归属。
 constexpr U32 ROUTE_FLAG_OFFSET=0x1Cu;
+// 字幕白名单规则在独立头文件中定义，便于不依赖 Windows 运行游戏的单元测试。
+constexpr U32 kAllowlistCount=cutscene_allowlist::kCount;
+bool IsAllowlisted(U32 hash);
+bool IsAllowlistedEntry(U32 hash,const char* key);
 // Bond.exe 的原生游戏事件；通过明文 EXE 里的发送点和注册名称双重确认。
 constexpr U32 CUTSCENE_START_ID=0xA2193087u, CUTSCENE_END_ID=0xA2193088u;
 constexpr U32 GAME_EVENT_SEND_VA=0x00E46E70u, GAME_EVENT_LOCK_VA=0x004E7EE0u;
@@ -99,6 +104,8 @@ volatile U32 g_subtitles_lock=0;
 volatile U32 g_cutscene_active=0;
 U32 g_cutscene_start_count=0,g_cutscene_end_count=0,g_cutscene_cleared=0;
 U32 g_native_route_clear=0;
+U32 g_allowlist_accepted=0,g_allowlist_in_cutscene=0;
+U32 g_allowlist_waited=0,g_allowlist_index_missing=0;
 
 void LockSubtitles(){
  while(__atomic_exchange_n(&g_subtitles_lock,1u,__ATOMIC_ACQUIRE)!=0u)Sleep(0);
@@ -117,11 +124,22 @@ void* g_cutscene_trampoline=nullptr;
 U32 g_cutscene_hook_ready=0;
 void OnCutsceneTransition(U32 type){
  if(type==CUTSCENE_START_ID){
+  // 先进入过场状态，再在短锁内清掉普通 NPC 字幕。
+  // 过场开始前刚触发的白名单对白必须保留，否则仍可能被切场事件吞掉。
   __atomic_store_n(&g_cutscene_active,1u,__ATOMIC_RELEASE);
-  ClearSubtitles();
+  LockSubtitles();
+  const U32 before=g_subtitles.visible_count+g_subtitles.waiting_count;
+  subtitle_queue::Retain(g_subtitles,IsAllowlisted);
+  const U32 kept=g_subtitles.visible_count+g_subtitles.waiting_count;
+  UnlockSubtitles();
   g_cutscene_start_count++;g_cutscene_cleared++;
-  Log("CUTSCENE_START_QUEUE_CLEARED",0,false);
+  if(g_diagnostics_enabled){
+   Log("CUTSCENE_START_QUEUE_BEFORE",before,true);
+   Log("CUTSCENE_START_QUEUE_RETAINED",kept,true);
+  }
  }else if(type==CUTSCENE_END_ID){
+  // 过场内特许显示的台词在离开过场时不延续到正常游玩画面。
+  ClearSubtitles();
   __atomic_store_n(&g_cutscene_active,0u,__ATOMIC_RELEASE);
   g_cutscene_end_count++;
   Log("CUTSCENE_END_QUEUE_RESUMED",0,false);
@@ -232,7 +250,7 @@ void Log(const char* key,U32 value=0,bool numeric=false){
  CatPad(line,now.minute,2,sizeof line);Cat(line,":",sizeof line);CatPad(line,now.second,2,sizeof line);
  Cat(line,".",sizeof line);CatPad(line,now.milliseconds,3,sizeof line);Cat(line,"] [tid=",sizeof line);
  CatNum(line,GetCurrentThreadId(),sizeof line);Cat(line,"] [ms=",sizeof line);CatNum(line,GetTickCount(),sizeof line);
- Cat(line,"] NPCSubtitles v0.1e-log6 ",sizeof line);Cat(line,key,sizeof line);
+ Cat(line,"] NPCSubtitles v0.1e-log9 ",sizeof line);Cat(line,key,sizeof line);
  if(numeric){Cat(line,"=",sizeof line);CatNum(line,value,sizeof line);}
  Cat(line,"\r\n",sizeof line);
  OutputDebugStringA(line);
@@ -281,6 +299,9 @@ void ReportStats(){
  LogPair("STATS missing_font_wait/invalid_viewport",g_diag_missing_font,g_diag_invalid_viewport);
  LogPair("STATS cutscene_start/end",g_cutscene_start_count,g_cutscene_end_count);
  LogPair("STATS cutscene_clear/native_clear",g_cutscene_cleared,g_native_route_clear);
+ Log("STATS cutscene_allowlist_count",kAllowlistCount,true);
+ LogPair("STATS allowlist_accepted/during_cutscene",g_allowlist_accepted,g_allowlist_in_cutscene);
+ LogPair("STATS allowlist_waited/index_missing",g_allowlist_waited,g_allowlist_index_missing);
 }
 bool Path(wchar_t* out,const wchar_t* suffix){out[0]=0;CatWide(out,g_folder,1024);CatWide(out,L"\\",1024);CatWide(out,suffix,1024);return WLen(out)<1020;}
 void* Method(void* obj,U32 slot){if(!obj)return nullptr;return (*(void***)obj)[slot];}
@@ -288,6 +309,9 @@ template<class Fn> Fn VFunc(void* obj,U32 slot){return reinterpret_cast<Fn>(Meth
 U32 U32At(const U8*p){return U32(p[0])|(U32(p[1])<<8)|(U32(p[2])<<16)|(U32(p[3])<<24);}
 U16 U16At(const U8*p){return U16(p[0]|(U16(p[1])<<8));}
 bool SameAscii(const char* a,const char*b){while(*a&&*b){if(Upper(*a)!=Upper(*b))return false;a++;b++;}return *a==*b;}
+// 运行时仅做四条固定整数比较，资源加载时额外核对原始键。
+bool IsAllowlisted(U32 hash){return cutscene_allowlist::IsHashAllowed((unsigned)hash);}
+bool IsAllowlistedEntry(U32 hash,const char* key){return cutscene_allowlist::IsExactEntryAllowed((unsigned)hash,key);}
 bool Contains(const char* hay,const char* needle){if(!needle||!*needle)return true;for(U32 i=0;hay[i];i++){U32 j=0;while(needle[j]&&Upper(hay[i+j])==Upper(needle[j]))j++;if(!needle[j])return true;}return false;}
 // 仅允许已确认的系统名称过滤，剩余 NPC 事件由运行时语义路由排重。
 bool SkipKey(const char* key){const char* blocked[]={"BOND","NICOLE","DANTE","MON_DIA_","_TUTORIAL_","_INFO_","_CS_"};for(U32 i=0;i<7;i++)if(Contains(key,blocked[i]))return true;return false;}
@@ -345,7 +369,8 @@ void ParseLoc(const wchar_t*path){Handle f=CreateFileW(path,0x80000000,1,nullptr
  if(!kstart){Log("LOC_REJECTED_KEY_TABLE");VirtualFree(data,0,0x8000);return;}g_files++;
  for(U32 i=0;i<keys;i++){U32 rec=kstart+8+i*8;U32 hash=U32At(data+rec),ko=U32At(data+rec+4)+kstart;U32 to=FindText(data,size,lang,langsize,txtcount,hash);if(!to||ko>=firstlang)continue;char key[160]={};U32 k=0;for(;k<159&&ko+k<firstlang&&data[ko+k]>=0x20&&data[ko+k]<=0x7e;k++)key[k]=char(data[ko+k]);if(!k||ko+k>=firstlang||data[ko+k]!=0)continue;
  wchar_t text[MAX_TEXT]={};U32 t=0;for(;t+1<MAX_TEXT&&to+t*2+1<lang+langsize;t++){U16 ch=U16At(data+to+t*2);if(!ch)break;text[t]=wchar_t(ch);}if(!t||to+t*2+1>=lang+langsize)continue;
- bool allowed=!SkipKey(key);AddEntry(hash,text,allowed);if(allowed)g_accepted++;
+ bool allowed=!SkipKey(key)||IsAllowlistedEntry(hash,key);
+ AddEntry(hash,text,allowed);if(allowed)g_accepted++;
  }VirtualFree(data,0,0x8000);
 }
 // 每份 LOC 单独记录加载结果，帮助定位资源损坏、文件缺失和读取异常。
@@ -364,7 +389,18 @@ void Walk(const wchar_t*root,U32 depth){if(depth>12)return;wchar_t search[1024]=
 void LoadIndex(){wchar_t loc[1024]={};Path(loc,L"BSCNContents\\loc");U32 a=GetFileAttributesW(loc);if(a==kInvalidFile||!(a&0x10)){LogPath("LOC_DIRECTORY_MISSING",loc);LogFailure("LOC_DIRECTORY_INVALID",GetLastError());return;}LogPath("LOC_DIRECTORY_SCAN",loc);Walk(loc,0);LogPair("NPC_DIALOGUE_INDEX_READY files_and_records",g_files,g_entries);}
 // 启用诊断时输出实际使用的原生事件字段和合法取值。
 // 游戏字幕提交的分支由游戏自身执行，插件仅决定是否额外入队。
+const Entry* FindEntry(U32 hash);
 void LogNativeEventRoute(){
+ Log("CUTSCENE_ALLOWLIST_EMBEDDED",kAllowlistCount,true);
+ if(g_diagnostics_enabled){
+  for(U32 i=0;i<kAllowlistCount;i++){
+   const Entry* entry=FindEntry(cutscene_allowlist::kEntries[i].hash);
+   if(!entry||!entry->allowed||entry->ambiguous){
+    g_allowlist_index_missing++;
+    LogHash("CUTSCENE_ALLOWLIST_LOC_MISSING_OR_AMBIGUOUS",cutscene_allowlist::kEntries[i].hash);
+   }
+  }
+ }
  Log("NATIVE_EVENT_ROUTE_OFFSET",ROUTE_FLAG_OFFSET,true);
  Log("NATIVE_EVENT_ROUTE_NATIVE_VALUE",0,true);
  Log("NATIVE_EVENT_ROUTE_NPC_VALUE",1,true);
@@ -430,28 +466,34 @@ extern "C" void CDECL AfterDialogue(U32 hash,void* result){
  // 无法可靠读取的事件保持静默，避免给游戏原生剧情强行补出第二份字幕。
  const bool route_known=g_route_known&&g_route_hash==hash;
  const bool npc_event=route_known&&g_route_is_npc!=0;
+ // 白名单仅为明确确认的历史遗漏对白开特例，不能取消普通事件的原生分流。
+ const bool allowlisted=IsAllowlisted(hash);
  g_route_known=0;
- if(!route_known){
+ if(!route_known&&!allowlisted){
   g_diag_route_unknown++;
   if(ShouldLogEvent(g_diag_route_unknown))LogHash("NPC_EVENT_ROUTE_UNKNOWN",hash);
   return;
  }
- if(!npc_event){
+ if(!npc_event&&!allowlisted){
   // 即便某些过场没有发送 CutSceneStart，原生剧情对白接管时也必须
   // 清掉此前可见和排队的环境对白，防止过场中残留。
   LockSubtitles();
   const bool pending=g_subtitles.visible_count||g_subtitles.waiting_count;
-  if(pending)subtitle_queue::Clear(g_subtitles);
+  if(pending)subtitle_queue::Retain(g_subtitles,IsAllowlisted);
   UnlockSubtitles();
   if(pending){g_native_route_clear++;Log("NATIVE_DIALOGUE_QUEUE_CLEARED");}
   g_diag_route++;
   if(ShouldLogEvent(g_diag_route))LogHash("NPC_NATIVE_EVENT_SUPPRESSED",hash);
   return;
  }
- // 过场期间不能把 NPC 台词重新加入显示队列。
- if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE))return;
+ // 过场期间只允许显式白名单入队，普通 NPC 仍按封版行为暂停。
+ if(!allowlisted&&__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE))return;
  const Entry* entry=FindEntry(hash);
- if(!entry){if(ShouldLogEvent(++g_event_miss_logs))LogHash("NPC_DIALOGUE_INDEX_MISS",hash);return;}
+ if(!entry){
+  if(allowlisted){g_allowlist_index_missing++;LogHash("CUTSCENE_ALLOWLIST_INDEX_MISS",hash);}
+  else if(ShouldLogEvent(++g_event_miss_logs))LogHash("NPC_DIALOGUE_INDEX_MISS",hash);
+  return;
+ }
  if(entry->ambiguous){if(ShouldLogEvent(++g_event_ambiguous_logs))LogHash("NPC_DIALOGUE_AMBIGUOUS_HASH",hash);return;}
  if(!entry->allowed){if(ShouldLogEvent(++g_event_filtered_logs))LogHash("NPC_DIALOGUE_FILTERED_HASH",hash);return;}
  if(ShouldLogEvent(++g_event_hit_logs))LogHash("NPC_DIALOGUE_INDEX_HIT",hash);
@@ -461,7 +503,8 @@ extern "C" void CDECL AfterDialogue(U32 hash,void* result){
  U32 duration=2400+length*85;if(duration>6500)duration=6500;
  LockSubtitles();
  // 二次检查必须位于锁内，防止过场刚开始时另一个线程仍插入旧对白。
- if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE)){UnlockSubtitles();return;}
+ const bool inside_scene=__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE)!=0;
+ if(inside_scene&&!allowlisted){UnlockSubtitles();return;}
  const auto enqueue_result=subtitle_queue::Push(g_subtitles,hash,entry->text,now,duration);
  const U32 visible=g_subtitles.visible_count;
  const U32 waiting=g_subtitles.waiting_count;
@@ -473,6 +516,14 @@ extern "C" void CDECL AfterDialogue(U32 hash,void* result){
   return;
  }
  g_diag_queue++;
+ if(allowlisted){
+  g_allowlist_accepted++;
+  if(inside_scene)g_allowlist_in_cutscene++;
+  if(enqueue_result==subtitle_queue::PushResult::Waiting)g_allowlist_waited++;
+  if(g_diagnostics_enabled){
+   LogHash(inside_scene?"CUTSCENE_ALLOWLIST_QUEUED_IN_SCENE":"CUTSCENE_ALLOWLIST_QUEUED",hash,entry->text);
+  }
+ }
  if(visible>g_diag_max_visible)g_diag_max_visible=visible;
  if(enqueue_result==subtitle_queue::PushResult::Waiting){
   g_diag_waiting++;
@@ -598,7 +649,6 @@ float AutoScale(U32 height){
 // 绘制前一次性快照三条消息，随后释放锁。
 // 单条长对白可以占用三行，多条对白优先各保留一行，合计始终不超过三行。
 void Draw(void* device){
- if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE))return;
  subtitle_queue::Item visible[3]={};
  U32 active=0;
  LockSubtitles();
@@ -606,6 +656,13 @@ void Draw(void* device){
  active=g_subtitles.visible_count;
  for(U32 i=0;i<active;i++)visible[i]=g_subtitles.visible[i];
  UnlockSubtitles();
+ // 游戏过场时，只允许已核实的白名单对白绘制。即使事件并发切换，
+ // 这里也再次过滤快照，避免普通 NPC 旧字幕残留一帧以上。
+ if(__atomic_load_n(&g_cutscene_active,__ATOMIC_ACQUIRE)){
+  U32 kept=0;
+  for(U32 i=0;i<active;i++)if(IsAllowlisted(visible[i].hash))visible[kept++]=visible[i];
+  active=kept;
+ }
  if(!active)return;
  Context c=Snapshot();if(!c.texture){g_diag_missing_font++;if(!g_logged_missing_font){Log("NATIVE_FONT_CAPTURE_WAIT");g_logged_missing_font=1;}return;}
  Viewport vp={};if(VFunc<HRESULT(WINAPI*)(void*,Viewport*)>(device,48)(device,&vp)<0||vp.width<8||vp.height<8){
@@ -825,7 +882,7 @@ void Checkpoint(const wchar_t* filename,const char* state){
  U32 n=0;while(filename[n]){full[at+n]=filename[n];++n;}full[at+n]=0;
  Handle f=CreateFileW(full,0x40000000,3,nullptr,2,0x80,nullptr);
  if(f==(Handle)-1)return;
- char text[180]={};Cat(text,"NPCSubtitles v0.1e-log6 stage=",180);
+ char text[180]={};Cat(text,"NPCSubtitles v0.1e-log9 stage=",180);
  CatNum(text,NPC_DIAG_STAGE,180);Cat(text," checkpoint=",180);
  Cat(text,state,180);Cat(text," tick_ms=",180);CatNum(text,GetTickCount(),180);Cat(text,"\r\n",180);
  U32 w=0;WriteFile(f,text,Len(text),&w,nullptr);CloseHandle(f);

@@ -49,7 +49,7 @@ class NativeContract(unittest.TestCase):
         self.assertIn('constexpr U32 ROUTE_FLAG_OFFSET=0x1Cu;',CODE)
         self.assertIn('g_route_is_npc=(value==1)?1u:0u;',CODE)
         self.assertIn('NPC_NATIVE_EVENT_SUPPRESSED',CODE)
-        self.assertLess(CODE.index('if(!npc_event)'),CODE.index('NPC_SUBTITLE_QUEUE_HASH'))
+        self.assertLess(CODE.index('if(!npc_event&&!allowlisted)'),CODE.index('NPC_SUBTITLE_QUEUE_HASH'))
         for forbidden in ('SemanticSignature(', 'Fnv(', 'k_embedded_routes', 'NATIVE_ROUTE_SUPPRESSED'):
             self.assertNotIn(forbidden,CODE)
 

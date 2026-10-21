@@ -41,6 +41,40 @@ inline void Clear(Queue&q){
 }
 
 
+// 保留符合条件的对白，清掉其他可见和等待项；用于过场切换时保护明确放行的台词。
+// FIFO 等待队列采用环形数组，逐项从队头取出后在队尾重新放回。
+// 每次循环都会先释放一个槽位，因此重新追加不会覆盖尚未处理的消息。
+// 不重新分配内存，也不改变保留消息的原有显示时间与先后顺序。
+template<class Keep>
+inline void Retain(Queue&q,Keep keep){
+ unsigned visible_write=0;
+ for(unsigned i=0;i<q.visible_count;i++){
+  if(keep(q.visible[i].hash)){
+   if(visible_write!=i)q.visible[visible_write]=q.visible[i];
+   visible_write++;
+  }
+ }
+ for(unsigned i=visible_write;i<kVisible;i++)q.visible[i].text[0]=0;
+ q.visible_count=visible_write;
+ const unsigned original_waiting=q.waiting_count;
+ for(unsigned i=0;i<original_waiting;i++){
+  Item item=q.waiting[q.waiting_head];
+  q.waiting[q.waiting_head].text[0]=0;
+  q.waiting_head=(q.waiting_head+1)%kWaiting;
+  q.waiting_count--;
+  if(keep(item.hash)){
+   const unsigned tail=(q.waiting_head+q.waiting_count)%kWaiting;
+   q.waiting[tail]=item;
+   q.waiting_count++;
+  }
+ }
+ if(!keep(q.last_hash)){
+  q.has_last=false;
+  q.last_hash=0;
+  q.last_seen_ms=0;
+ }
+}
+
 // 用显式的有界复制，保证异常长的 LOC 文本不会溢出固定缓冲区。
 inline Item MakeItem(unsigned hash,const wchar_t*text,unsigned duration_ms){
  Item item = {};

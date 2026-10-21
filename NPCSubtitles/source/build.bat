@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal EnableExtensions
 REM 默认构建完整 NPC 字幕候选：对白、原生字形和 D3D9 均启用。  
-set "ROOT=%~dp0.."
+set "ROOT=%~dp0..\.."
 set "BUILD=%ROOT%\.build\NPCSubtitles"
 if not exist "%BUILD%" mkdir "%BUILD%"
 REM 优先使用 Clang/LLD，构建出的 PE 使用可复现时间戳。  
