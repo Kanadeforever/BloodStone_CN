@@ -1,0 +1,8 @@
+LIBRARY dinput8
+EXPORTS
+DirectInput8Create=_JOYSHIM_System_DirectInput8Create@20 @1
+DllCanUnloadNow=_JOYSHIM_System_DllCanUnloadNow@0 PRIVATE
+DllGetClassObject=_JOYSHIM_System_DllGetClassObject@12 PRIVATE
+DllRegisterServer=_JOYSHIM_System_DllRegisterServer@0 PRIVATE
+DllUnregisterServer=_JOYSHIM_System_DllUnregisterServer@0 PRIVATE
+GetdfDIJoystick=_JOYSHIM_System_GetdfDIJoystick@0 @6

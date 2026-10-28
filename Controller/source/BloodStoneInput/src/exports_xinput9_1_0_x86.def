@@ -1,0 +1,6 @@
+LIBRARY xinput9_1_0
+EXPORTS
+XInputGetCapabilities=_XInputGetCapabilities@12 @1
+XInputGetDSoundAudioDeviceGuids=_XInputGetDSoundAudioDeviceGuids@12 @2
+XInputSetState=_XInputSetState@8 @3
+XInputGetState=_XInputGetState@8 @4

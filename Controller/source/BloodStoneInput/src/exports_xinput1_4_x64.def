@@ -1,0 +1,15 @@
+LIBRARY xinput1_4
+EXPORTS
+DllMain=JoyShimExportedDllMain @1 PRIVATE
+XInputGetState=XInputGetState @2
+XInputSetState=XInputSetState @3
+XInputGetCapabilities=XInputGetCapabilities @4
+XInputEnable=XInputEnable @5
+XInputGetBatteryInformation=XInputGetBatteryInformation @7
+XInputGetKeystroke=XInputGetKeystroke @8
+XInputGetAudioDeviceIds=XInputGetAudioDeviceIds @10
+XInputGetStateEx=XInputGetStateEx @100 NONAME
+XInputWaitForGuideButton=XInputWaitForGuideButton @101 NONAME
+XInputCancelGuideButtonWait=XInputCancelGuideButtonWait @102 NONAME
+XInputPowerOffController=XInputPowerOffController @103 NONAME
+XInputGetCapabilitiesEx=JoyShimGetCapabilitiesEx @108
